@@ -107,7 +107,7 @@ switch caso
 Area_inner_polygon = @(ri) n*(ri^2)*tan(pi/n); % Area poligono regolare interno, senza punte
 % Perim_inner_polygon = 2*n*ri*tan(pi/n);
 side_inner_polygon = @(ri) 2*ri*tan(pi/n); % Lato poligono regolare
-Area_external_triangle = @(re, ri) 0.25*(re-ri)*side_inner_polygon(ri); % Area di una punta della stella
+Area_external_triangle = @(re, ri) 0.5*(re-ri)*side_inner_polygon(ri); % Area di una punta della stella
 Area_external_triangles = @(re, ri) n*Area_external_triangle(re,ri); % Area di tutte le punte
 Ap_fun = @(re, ri) Area_inner_polygon(ri) + Area_external_triangles(re,ri); % Area totale stella
 
