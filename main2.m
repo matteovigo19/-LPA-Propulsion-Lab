@@ -47,7 +47,7 @@ OFmax = 19.5;                 % [-]
 pmin = 101325;                % [Pa]
 pmax = 99e5;                  % [Pa]
 
-tmax = 300;                   % [s]
+tmax = 30;                   % [s]
 pamb = 0;                     % [Pa]
 
 % ================= ENGINE DATA =================
@@ -55,10 +55,10 @@ pamb = 0;                     % [Pa]
 ext_diameter = 2*diam_e;          % [m]
 chamber_length = L; %da predesign       % [m]
 
-throat_diameter = 0.005;       % [m]
+throat_diameter = 0.15;       % [m]
 %eps = 2; da predesign
 
-At = 0.25*pi*(throat_diameter^2);   % [m^2]
+%At = 0.25*pi*(throat_diameter^2);   % [m^2]
 
 % Camera coerente in SI
 D_camera = ext_diameter;      % [m]
@@ -156,6 +156,34 @@ fprintf("rf iniziale stimata  = %.6e m/s = %.6f mm/s\n", ...
     rf_test, rf_test*1e3);
 fprintf("regressione stimata in tmax = %.6e m = %.6f mm\n", ...
     rf_test*tmax, rf_test*tmax*1e3);
+
+
+%% === DIMENSIONAMENTO AREA DI GOLA IN BASE ALLA PRESSIONE ===
+pc_target_bar = pch_bar;               % [bar] INSERISCI QUI LA TUA PRESSIONE INIZIALE VOLUTA
+pc_target = pc_target_bar * 1e5;  % [Pa]
+
+% 1. Calcolo del flusso iniziale (indipendente dalla pressione)
+Gox0 = mox / Ap0;
+rf0 = a_rf * Gox0^n_rf;
+Ab0 = perim0 * chamber_length;
+mdot_f0 = rho_f * Ab0 * rf0;
+
+% 2. Portata totale e rapporto di miscela
+mdot_tot = mox + mdot_f0;
+OF0 = mox / mdot_f0;
+
+% 3. Calcolo del c* (usando le funzioni CEA interpolate alla pressione target)
+Tc0 = T_fun_of_p(OF0, pc_target_bar);
+k0 = k_fun_of_p(OF0, pc_target_bar);
+R0 = R_fun_of_p(OF0, pc_target_bar);
+
+% Formula del coefficiente di Vandenkerckhove (al quadrato)
+K2 = k0 * ((2/(k0+1))^((k0+1)/(k0-1))); 
+cstar0 = sqrt(R0 * Tc0 / K2);
+
+% 4. Area e diametro di gola
+At = (mdot_tot * cstar0) / pc_target;
+throat_diameter = 2 * sqrt(At / pi);
 
 
 %% Compact data in vars
