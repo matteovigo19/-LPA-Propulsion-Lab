@@ -16,7 +16,7 @@ vars.geometry.ntips = n_tips; % da predesign
 
 % Mesh in SI: metri
 vars.geometry.diametro_est = diam_e;    % [m]   da predesign
-vars.geometry.diametro_int = diam_in;     % [m]   da predesign
+vars.geometry.diametro_int = diam_i;     % [m]   da predesign
 
 vars.geometry.cyl_tol_rel = 0.03;
 vars.geometry.cyl_tol_abs = 0.15e-3;   % 0.15 mm

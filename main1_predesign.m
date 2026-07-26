@@ -65,51 +65,151 @@ Ap = mox/GOX;
 diam_cyl_ref = 2*sqrt(Ap/pi);
 rad_cyl_ref = 0.5*diam_cyl_ref; %raggio del cilindro corrispondente tale che Ap sia coerente
 %
-%% ---------WHICH GEOMETRY-------------
+%% --------- WHICH GEOMETRY -------------
+
 % caso = "cylinder";
 
- caso = "star";
- n_tips = 5;
-radius = rad_cyl_ref*0.7; %qui praticamente impongo il raggio interno
+caso = "star";
+n_tips = 5;
 
-%caso = "RAT";
-   % radius = rad_cyl_ref*0.7;
+radius = rad_cyl_ref*0.7;
+
+% caso = "RAT";
+% radius = rad_cyl_ref*0.7;
 
 switch caso
+
     case "star"
-Area_inner_polygon = @(ri) n_tips*(ri^2)*tan(pi/n_tips);
-% Perim_inner_polygon = 2*n_tips*ri*tan(pi/n_tips);
-side_inner_polygon = @(ri) 2*ri*tan(pi/n_tips);
-Area_external_triangle = @(re, ri) 0.5*(re-ri)*side_inner_polygon(ri);  % ERRORE E' 0.5 non 0.25
-Area_external_triangles = @(re, ri) n_tips*Area_external_triangle(re,ri);
-Ap_fun = @(re, ri) Area_inner_polygon(ri) + Area_external_triangles(re,ri);
 
-if radius < rad_cyl_ref
-    %radius is the inner radius
-    ri = radius;
-    re = fzero(@(re) Ap-Ap_fun(re, ri), rad_cyl_ref);
-elseif radius > rad_cyl_ref
-    %radius is the outer radius
-    re = radius;
-    ri = fzero(@(ri) Ap-Ap_fun(re, ri), rad_cyl_ref);
-else
-    % this is a cylinder...
-    ri = radius;
-    re = radius;
-end
-% r_tip_in = ri/cos(pi/n_tips);
-% diam_in = 2*r_tip_in;
-l_triangle = sqrt((re-r_tip_in)^2+(0.5*side_inner_polygon(r_tip_in))^2);
-Pb = 2*n_tips*l_triangle;
-L = fox/(rho_f*Pb*a_rf*(mox^n_rf)/Ap^n_rf);
+        % Angolo tra una punta interna e una punta esterna consecutiva
+        alpha = pi/n_tips;
 
-diam_e = re*2;
+        %% FUNZIONI GEOMETRICHE
 
-case "RAT"
-    
-end
+        % Area del poligono formato collegando le punte interne.
+        % ri è il raggio circoscritto, non l'apotema.
+        Area_inner_polygon = @(ri) ...
+            0.5*n_tips*ri.^2*sin(2*alpha);
 
+        % Lato del poligono che collega due punte interne consecutive
+        side_inner_polygon = @(ri) ...
+            2*ri.*sin(alpha);
+
+        % Area di uno dei triangoli esterni.
+        %
+        % La base è il lato del poligono interno.
+        % L'altezza è:
+        % re - ri*cos(alpha)
+        Area_external_triangle = @(re,ri) ...
+            0.5.*side_inner_polygon(ri).* ...
+            (re - ri.*cos(alpha));
+
+        % Area complessiva dei triangoli esterni
+        Area_external_triangles = @(re,ri) ...
+            n_tips.*Area_external_triangle(re,ri);
+
+        % Area complessiva della stella
+        Ap_fun = @(re,ri) ...
+            Area_inner_polygon(ri) + ...
+            Area_external_triangles(re,ri);
+
+        % Formula equivalente semplificata:
+        Ap_fun_direct = @(re,ri) ...
+            n_tips.*re.*ri.*sin(alpha);
+
+        % Lunghezza del segmento tra una punta interna e una esterna
+        star_side_fun = @(re,ri) ...
+            sqrt(re.^2 + ri.^2 - ...
+            2.*re.*ri.*cos(alpha));
+
+        % Perimetro complessivo della stella
+        Pb_fun = @(re,ri) ...
+            2*n_tips.*star_side_fun(re,ri);
+
+
+        %% DETERMINAZIONE DI ri E re
+
+        if radius < rad_cyl_ref
+
+            % radius rappresenta il raggio delle punte interne
+            ri = radius;
+
+            % Dall'equazione:
+            % Ap = n_tips*ri*re*sin(alpha)
+            re = Ap/(n_tips*ri*sin(alpha));
+
+        elseif radius > rad_cyl_ref
+
+            % radius rappresenta il raggio delle punte esterne
+            re = radius;
+
+            % Dall'equazione:
+            % Ap = n_tips*ri*re*sin(alpha)
+            ri = Ap/(n_tips*re*sin(alpha));
+
+        else
+
+            % Caso degenere: tutte le punte sono sulla stessa
+            % circonferenza.
+            ri = radius;
+            re = radius;
+
+        end
+
+
+        %% CONTROLLI DI COERENZA
+
+        if ri <= 0 || re <= 0
+            error('I raggi ri e re devono essere positivi.');
+        end
+
+        if re < ri
+            error(['Geometria non valida: il raggio delle punte esterne ' ...
+                   're risulta minore del raggio interno ri.']);
+        end
+
+
+        %% AREA E PERIMETRO RISULTANTI
+
+        Ap_geometry = Ap_fun(re,ri);
+        Pb = Pb_fun(re,ri);
+
+        % Controllo numerico dell'area
+        area_relative_error = abs(Ap_geometry - Ap)/max(abs(Ap),eps);
+
+        if area_relative_error > 1e-10
+            warning(['L''area geometrica non coincide con Ap. ' ...
+                     'Errore relativo: %.3e'], ...
+                     area_relative_error);
+        end
+
+
+        %% LUNGHEZZA DEL GRANO
+
+        L = fox/(rho_f*Pb*a_rf*(mox^n_rf)/Ap^n_rf);
+
+
+        %% DIAMETRI CARATTERISTICI
+
+        diam_i = 2*ri;
+        diam_e = 2*re;
+
+
+        %% STAMPA DI CONTROLLO
+
+        fprintf('\n--- Geometria stella ---\n');
+        fprintf('Numero punte:             %d\n', n_tips);
+        fprintf('Raggio punte interne ri:  %.6f m\n', ri);
+        fprintf('Raggio punte esterne re:  %.6f m\n', re);
+        fprintf('Diametro interno:         %.6f m\n', diam_i);
+        fprintf('Diametro esterno:         %.6f m\n', diam_e);
+        fprintf('Area assegnata Ap:        %.8e m^2\n', Ap);
+        fprintf('Area ricalcolata:         %.8e m^2\n', Ap_geometry);
+        fprintf('Perimetro Pb:             %.8e m\n', Pb);
+        fprintf('Lunghezza grano L:        %.8e m\n', L);
 
 save('prevars.mat', ...
-    'L', 'diam_in','diam_e','n_tips','mox','eps','Ap','Pb', ...
+    'L', 'diam_i','diam_e','n_tips','mox','eps','Ap','Pb', ...
     '-mat');
+
+end
