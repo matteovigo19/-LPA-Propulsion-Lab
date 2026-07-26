@@ -6,15 +6,17 @@ clc;
 
 % ================= GEOMETRY DATA =================
 
+load("prevars.mat");
+
 type = "star";
 
-multiplyer = 100;
+multiplyer = 80;
 
-vars.geometry.ntips = 10;
+vars.geometry.ntips = n_tips; % da predesign
 
 % Mesh in SI: metri
-vars.geometry.diametro_est = 2.5e-2;    % [m]
-vars.geometry.diametro_int = 3.5e-2;     % [m]
+vars.geometry.diametro_est = diam_e;    % [m]   da predesign
+vars.geometry.diametro_int = diam_in;     % [m]   da predesign
 
 vars.geometry.cyl_tol_rel = 0.03;
 vars.geometry.cyl_tol_abs = 0.15e-3;   % 0.15 mm
@@ -35,7 +37,7 @@ a_rf = a_rf * 1e-3;           % [(m/s)/((kg/m^2 s)^n)]
 % ================= COMBUSTION DATA =================
 % OXIDIZER: O2
 
-mox = 0.015;                  % [kg/s]
+%mox = 0.015;                  % [kg/s]  da predesign
 
 load("CEA_functions.mat");
 
@@ -45,16 +47,16 @@ OFmax = 19.5;                 % [-]
 pmin = 101325;                % [Pa]
 pmax = 99e5;                  % [Pa]
 
-tmax = 10;                    % [s]
-pamb = 101325;                % [Pa]
+tmax = 300;                   % [s]
+pamb = 0;                     % [Pa]
 
 % ================= ENGINE DATA =================
 
-ext_diameter = 0.06;          % [m]
-chamber_length = 0.09;        % [m]
+ext_diameter = 2*diam_e;          % [m]
+chamber_length = L; %da predesign       % [m]
 
 throat_diameter = 0.005;       % [m]
-eps = 2;
+%eps = 2; da predesign
 
 At = 0.25*pi*(throat_diameter^2);   % [m^2]
 
@@ -133,6 +135,14 @@ title('Controllo indici vertici');
 % ============================================================
 
 [perim0, Ap0] = eval_mesh(coord_mesh, "cartesian");
+
+tol=1e-4;
+if Ap-Ap0>tol
+    fprintf("errore cazzo")
+    return
+end
+
+%CHECK SU PERIM0 E AP0 controlla coerenza con predesign
 
 fprintf("\nGeometria iniziale:\n");
 fprintf("perimeter = %.6e m\n", perim0);
@@ -409,18 +419,31 @@ fprintf("\nNumero punti usati per il plot = %d\n", n_common);
 
 
 %% ============================================================
-%  CALCOLO AREA, PERIMETRO E GOX NEL TEMPO
+%  CALCOLO AREA, PERIMETRO, GOX, RF, MDOT_F E O/F NEL TEMPO
 % ============================================================
 
 n_steps_geom = size(Y_plot, 1);
 
-area_t_m2 = zeros(n_steps_geom, 1);
-area_t_mm2 = zeros(n_steps_geom, 1);
+area_t_m2 = NaN(n_steps_geom, 1);
+area_t_mm2 = NaN(n_steps_geom, 1);
 
-perimetro_t_m = zeros(n_steps_geom, 1);
-perimetro_t_mm = zeros(n_steps_geom, 1);
+perimetro_t_m = NaN(n_steps_geom, 1);
+perimetro_t_mm = NaN(n_steps_geom, 1);
 
-Gox_t = zeros(n_steps_geom, 1);
+Gox_t = NaN(n_steps_geom, 1);
+rf_t = NaN(n_steps_geom, 1);
+
+Ab_t = NaN(n_steps_geom, 1);
+mdot_f_t = NaN(n_steps_geom, 1);
+mdot_in_t = NaN(n_steps_geom, 1);
+
+OF_t = NaN(n_steps_geom, 1);
+
+L      = vars.geometry.grain_length;
+mox    = vars.combustion.mdot_ox;
+a_rf   = vars.fuel.a_rf;
+n_rf   = vars.fuel.n_rf;
+rho_f  = vars.fuel.rho_f;
 
 for k = 1:n_steps_geom
 
@@ -432,10 +455,30 @@ for k = 1:n_steps_geom
     perimetro_t_mm(k) = perimetro_t_m(k) * 1e3;
     area_t_mm2(k) = area_t_m2(k) * 1e6;
 
-    if area_t_m2(k) > 0
+    if area_t_m2(k) > 0 && perimetro_t_m(k) > 0
+
+        % Flusso ossidante
         Gox_t(k) = mox / area_t_m2(k);
-    else
-        Gox_t(k) = NaN;
+
+        % Velocità di regressione
+        rf_t(k) = a_rf * Gox_t(k)^n_rf;
+
+        % Area bruciante
+        Ab_t(k) = perimetro_t_m(k) * L;
+
+        % Portata di fuel
+        mdot_f_t(k) = rho_f * Ab_t(k) * rf_t(k);
+
+        % Portata totale entrante
+        mdot_in_t(k) = mdot_f_t(k) + mox;
+
+        % Rapporto ossidante/fuel
+        if mdot_f_t(k) > 0
+            OF_t(k) = mox / mdot_f_t(k);
+        else
+            OF_t(k) = NaN;
+        end
+
     end
 
 end
@@ -501,6 +544,86 @@ ylabel('G_{ox} [kg/(m^2 s)]');
 title("Evoluzione G_{ox} - caso " + plot_label);
 legend('Location', 'best');
 
+
+%% ============================================================
+%  PLOT EVOLUZIONE O/F
+% ============================================================
+
+figure;
+hold on;
+grid on;
+
+plot(t_plot, OF_t, ...
+    'LineWidth', 1.8, ...
+    'DisplayName', 'O/F');
+
+if isfield(vars.combustion, "OFmin")
+    yline(vars.combustion.OFmin, 'k--', ...
+        'LineWidth', 1.2, ...
+        'DisplayName', 'O/F min CEA');
+end
+
+if isfield(vars.combustion, "OFmax")
+    yline(vars.combustion.OFmax, 'k--', ...
+        'LineWidth', 1.2, ...
+        'DisplayName', 'O/F max CEA');
+end
+
+xlabel('Tempo [s]');
+ylabel('O/F [-]');
+title("Evoluzione O/F - caso " + plot_label);
+legend('Location', 'best');
+
+
+%% ============================================================
+%  PLOT CONFRONTO GOX E O/F
+% ============================================================
+
+figure;
+hold on;
+grid on;
+
+yyaxis left
+plot(t_plot, Gox_t, ...
+    'LineWidth', 1.8, ...
+    'DisplayName', 'G_{ox}');
+ylabel('G_{ox} [kg/(m^2 s)]');
+
+yyaxis right
+plot(t_plot, OF_t, ...
+    'LineWidth', 1.8, ...
+    'DisplayName', 'O/F');
+ylabel('O/F [-]');
+
+xlabel('Tempo [s]');
+title("Confronto G_{ox} e O/F - caso " + plot_label);
+legend('Location', 'best');
+
+
+%% ============================================================
+%  PLOT EVOLUZIONE PORTATE
+% ============================================================
+
+figure;
+hold on;
+grid on;
+
+plot(t_plot, mox*ones(size(t_plot)), ...
+    'LineWidth', 1.8, ...
+    'DisplayName', '\dot{m}_{ox}');
+
+plot(t_plot, mdot_f_t, ...
+    'LineWidth', 1.8, ...
+    'DisplayName', '\dot{m}_{f}');
+
+plot(t_plot, mdot_in_t, ...
+    'LineWidth', 1.8, ...
+    'DisplayName', '\dot{m}_{in}');
+
+xlabel('Tempo [s]');
+ylabel('Portata [kg/s]');
+title("Evoluzione portate - caso " + plot_label);
+legend('Location', 'best');
 
 %% ============================================================
 %  PLOT VARIAZIONE GLOBALE MESH
