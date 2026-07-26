@@ -4,6 +4,8 @@ clc;
 
 %% STEP 0: data
 
+tic;
+
 % ================= GEOMETRY DATA =================
 
 load("prevars.mat");
@@ -20,6 +22,7 @@ vars.geometry.diametro_int = diam_i;     % [m]   da predesign
 
 vars.geometry.cyl_tol_rel = 0.03;
 vars.geometry.cyl_tol_abs = 0.15e-3;   % 0.15 mm
+
 
 n = multiplyer * vars.geometry.ntips;
 
@@ -47,7 +50,7 @@ OFmax = 19.5;                 % [-]
 pmin = 101325;                % [Pa]
 pmax = 99e5;                  % [Pa]
 
-tmax = 30;                   % [s]
+tmax = 400;                   % [s]
 pamb = 0;                     % [Pa]
 
 % ================= ENGINE DATA =================
@@ -199,7 +202,7 @@ vars.geometry.idx_v_interni = idx_v_interni;
 vars.geometry.idx_v_esterni = idx_v_esterni;
 vars.geometry.D_camera = D_camera;
 vars.geometry.type = type;
-vars.geometry.wall_tol = 1e-10 * D_camera;
+vars.geometry.wall_tol = 1e-3 * D_camera;
 
 % fuel
 vars.fuel.a_rf = a_rf;
@@ -933,7 +936,7 @@ for jj = 1:length(idx_anim)
 
 end
 
-
+toc
 %% ============================================================
 %  FUNZIONE LOCALE: STATO -> PUNTI
 % ============================================================
@@ -1032,16 +1035,18 @@ function [value, isterminal, direction] = chamber_full_event(~, y, vars, plot_ca
 
         case "refined"
 
-            % Uso la stessa mesh che poi vai a considerare fisicamente
-            P_check = refine_mesh_v3(P_raw, idx_v_interni);
+    % Prima correzione sulla mesh grezza
+    [P_raw, ~] = refine_mesh_camera(P_raw, D_camera);
 
-            % Se hai già attiva una logica cilindrica in ode_coupled,
-            % puoi anche decidere di non raffinare quando la geometria
-            % è quasi cilindrica. Per ora tengo la versione semplice.
+    % Raffinamento
+    P_check = refine_mesh_v3(P_raw, idx_v_interni);
+
+    % Seconda correzione dopo il raffinamento
+    [P_check, ~] = refine_mesh_camera(P_check, D_camera);
 
         case "ode45"
 
-            P_check = P_raw;
+    [P_check, ~] = refine_mesh_camera(P_raw, D_camera);
 
         otherwise
 
@@ -1061,7 +1066,7 @@ function [value, isterminal, direction] = chamber_full_event(~, y, vars, plot_ca
     if isfield(vars.geometry, "wall_event_tol")
         wall_event_tol = vars.geometry.wall_event_tol;
     else
-        wall_event_tol = 1e-6;   % [m] = 0.001 mm
+        wall_event_tol = 1e-3;   % [m] = 0.001 mm
     end
 
     % Voglio fermarmi quando anche il punto più interno è arrivato
