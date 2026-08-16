@@ -115,8 +115,8 @@ RT_matrix = R_matrix.*T_matrix;
 % [dRdOF_matrix, dRdp_matrix] = gradient(R_matrix, o_f_vector, p_vector);
 % [dkdOF_matrix, dkdp_matrix] = gradient(k_matrix, o_f_vector, p_vector);
 
-dRTdp_fun_of_p = griddedInterpolant({o_f_vector, p_vector}, dRTdp_matrix',"linear","none");
-dRTdOF_fun_of_p = griddedInterpolant({o_f_vector, p_vector}, dRTdOF_matrix',"linear","none");
+dRTdp_fun_OF_p = griddedInterpolant({o_f_vector, p_vector}, dRTdp_matrix',"linear","none");
+dRTdOF_fun_OF_p = griddedInterpolant({o_f_vector, p_vector}, dRTdOF_matrix',"linear","none");
 % dTdp_fun_of_p = griddedInterpolant({o_f_vector, p_vector}, dTdp_matrix',"linear","none");
 % dTdOF_fun_of_p = griddedInterpolant({o_f_vector, p_vector}, dTdOF_matrix',"linear","none");
 % dRdp_fun_of_p = griddedInterpolant({o_f_vector, p_vector}, dRdp_matrix',"linear","none");
@@ -127,7 +127,7 @@ dRTdOF_fun_of_p = griddedInterpolant({o_f_vector, p_vector}, dRTdOF_matrix',"lin
 %% save in a .mat file for future use
 save('CEA_functions.mat', ...
     'T_fun_of_p', 'R_fun_of_p', 'k_fun_of_p', ...
-    'dRTdp_fun_of_p','dRTdOF_fun_of_p', ...
+    'dRTdp_fun_OF_p','dRTdOF_fun_OF_p', ...
     '-mat');
 
 %% ------------------------------------
