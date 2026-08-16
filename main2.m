@@ -10,21 +10,32 @@ tic;
 
 load("prevars.mat");
 
-type = "star";
+if type == "star"
 
-multiplyer = 80;
+    multiplyer = 80;
+    vars.geometry.ntips = n_tips; % da predesign
+    vars.geometry.diametro_est = diam_e;    % [m]   da predesign
+    vars.geometry.diametro_int = diam_i;     % [m]   da predesign
+    n = multiplyer * vars.geometry.ntips;
 
-vars.geometry.ntips = n_tips; % da predesign
+else if type == "cylinder"
+       
+    n = 500;
+    vars.geometry.diametro = diam;
+
+else
+
+    frpintf("type non riconosciuto")
+
+end
+end
+
 
 % Mesh in SI: metri
-vars.geometry.diametro_est = diam_e;    % [m]   da predesign
-vars.geometry.diametro_int = diam_i;     % [m]   da predesign
 
 vars.geometry.cyl_tol_rel = 0.03;
 vars.geometry.cyl_tol_abs = 0.15e-3;   % 0.15 mm
 
-
-n = multiplyer * vars.geometry.ntips;
 
 % ================= FUEL DATA =================
 % FUEL: HTPB
@@ -55,7 +66,7 @@ pamb = 0;                     % [Pa]
 
 % ================= ENGINE DATA =================
 
-ext_diameter = 2*diam_e;          % [m]
+ext_diameter = 280.1*2e-3;          % [m]
 chamber_length = L; %da predesign       % [m]
 
 throat_diameter = 0.15;       % [m]
@@ -78,28 +89,30 @@ D_camera = ext_diameter;      % [m]
 
 r_v = vecnorm(coord_mesh(idx_v,:), 2, 2);
 
-r_thr = 0.5 * (min(r_v) + max(r_v));
+if type == "star"
 
-idx_v_interni = idx_v(r_v < r_thr);
-idx_v_esterni = idx_v(r_v >= r_thr);
+    r_thr = 0.5 * (min(r_v) + max(r_v));
+    idx_v_interni = idx_v(r_v < r_thr);
+    idx_v_esterni = idx_v(r_v >= r_thr);
 
 
-%% ============================================================
-%  CHECK INDICI
-% ============================================================
+    %% ============================================================
+    %  CHECK INDICI
+    % ============================================================
 
-n_mesh = size(coord_mesh,1);
+    n_mesh = size(coord_mesh,1);
 
-fprintf("\nDEBUG MESH INIZIALE:\n");
-fprintf("n_mesh = %d\n", n_mesh);
-fprintf("max(idx_v) = %d\n", max(idx_v));
-fprintf("max(idx_v_interni) = %d\n", max(idx_v_interni));
-fprintf("max(idx_v_esterni) = %d\n", max(idx_v_esterni));
+    fprintf("\nDEBUG MESH INIZIALE:\n");
+    fprintf("n_mesh = %d\n", n_mesh);
+    fprintf("max(idx_v) = %d\n", max(idx_v));
+    fprintf("max(idx_v_interni) = %d\n", max(idx_v_interni));
+    fprintf("max(idx_v_esterni) = %d\n", max(idx_v_esterni));
 
-if max(idx_v) > n_mesh || max(idx_v_interni) > n_mesh || max(idx_v_esterni) > n_mesh
-    error("Indici punte non coerenti con coord_mesh.");
+    if max(idx_v) > n_mesh || max(idx_v_interni) > n_mesh || max(idx_v_esterni) > n_mesh
+        error("Indici punte non coerenti con coord_mesh.");
+    end
+
 end
-
 
 %% ============================================================
 %  OUTPUT MESH INIZIALE
@@ -110,27 +123,29 @@ plot(coord_mesh(:,1)*1e3, coord_mesh(:,2)*1e3, 'b.-', ...
     'DisplayName', 'mesh iniziale');
 hold on;
 
-plot(coord_mesh(idx_v,1)*1e3, coord_mesh(idx_v,2)*1e3, 'ko', ...
-     'MarkerSize', 8, ...
-     'LineWidth', 1.5, ...
-     'DisplayName', 'tutti i vertici');
+if type == "star"
+    plot(coord_mesh(idx_v,1)*1e3, coord_mesh(idx_v,2)*1e3, 'ko', ...
+        'MarkerSize', 8, ...
+        'LineWidth', 1.5, ...
+        'DisplayName', 'tutti i vertici');
 
-plot(coord_mesh(idx_v_interni,1)*1e3, coord_mesh(idx_v_interni,2)*1e3, 'ro', ...
-     'MarkerSize', 10, ...
-     'LineWidth', 2, ...
-     'DisplayName', 'punte interne');
+    plot(coord_mesh(idx_v_interni,1)*1e3, coord_mesh(idx_v_interni,2)*1e3, 'ro', ...
+        'MarkerSize', 10, ...
+        'LineWidth', 2, ...
+        'DisplayName', 'punte interne');
 
-plot(coord_mesh(idx_v_esterni,1)*1e3, coord_mesh(idx_v_esterni,2)*1e3, 'gs', ...
-     'MarkerSize', 8, ...
-     'LineWidth', 1.5, ...
-     'DisplayName', 'punte esterne');
+    plot(coord_mesh(idx_v_esterni,1)*1e3, coord_mesh(idx_v_esterni,2)*1e3, 'gs', ...
+        'MarkerSize', 8, ...
+        'LineWidth', 1.5, ...
+        'DisplayName', 'punte esterne');
+end 
 
 axis equal;
 grid on;
 legend('Location','best');
 xlabel('x [mm]');
 ylabel('y [mm]');
-title('Controllo indici vertici');
+title('mesh iniziale');
 
 
 %% ============================================================
@@ -141,7 +156,7 @@ title('Controllo indici vertici');
 
 tol=1e-4;
 if Ap-Ap0>tol
-    fprintf("errore cazzo")
+    fprintf("L'area di porto del main2 e del predesign non corrispondono")
     return
 end
 
@@ -196,10 +211,14 @@ vars.geometry.port_area = Ap0;
 vars.geometry.burning_perimeter = perim0;
 vars.geometry.grain_length = chamber_length;
 vars.geometry.throat_area = At;
+vars.geometry.type = type;
 
-vars.geometry.idx_v = idx_v;
-vars.geometry.idx_v_interni = idx_v_interni;
-vars.geometry.idx_v_esterni = idx_v_esterni;
+if type == "star"
+    vars.geometry.idx_v = idx_v;
+    vars.geometry.idx_v_interni = idx_v_interni;
+    vars.geometry.idx_v_esterni = idx_v_esterni;
+end
+
 vars.geometry.D_camera = D_camera;
 vars.geometry.type = type;
 vars.geometry.wall_tol = 1e-3 * D_camera;
@@ -214,6 +233,8 @@ vars.combustion.mdot_ox = mox;
 vars.combustion.Tc_fun = T_fun_of_p;
 vars.combustion.R_fun = R_fun_of_p;
 vars.combustion.k_fun = k_fun_of_p;
+vars.combustion.dRTdOF_fun_OF_p = dRTdOF_fun_of_p;
+vars.combustion.dRTdp_fun_OF_p = dRTdp_fun_of_p;
 
 vars.combustion.OFmin = OFmin;
 vars.combustion.OFmax = OFmax;
@@ -261,10 +282,14 @@ fprintf("\tO/F      = %.2f\n", OF0);
 %  STEP 3: INTEGRATE COUPLED CHAMBER + MESH SYSTEM
 % ============================================================
 
-fine_ode_boolean = false;
+fine_ode_boolean = true;
 
 plot_case = "refined";
 % plot_case = "ode45";
+
+if type == "star"
+    plot_case="refined";
+end
 
 Y0 = [coord_mesh(:,1); coord_mesh(:,2)];
 
@@ -279,7 +304,7 @@ t0 = 0;
 tf = tmax;
 
 % Forzo output temporali regolari, così i plot mostrano davvero più istanti
-n_output = 10;
+n_output = 8;
 tspan = linspace(t0, tf, n_output);
 
 odefun = @(t,y) ode_coupled( ...
@@ -315,33 +340,35 @@ Y_ode  = y_in_time(:,2:end);  % mesh grezza nel tempo
 % se vuoi includere anche il vincolo della camera nel post-processing,
 % decommenta le righe indicate dentro il ciclo.
 
-n_steps = length(t_ode);
+if plot_case == "refined"
 
-Y_ode_refined = zeros(size(Y_ode));
+    n_steps = length(t_ode);
 
-for k = 1:n_steps
+    Y_ode_refined = zeros(size(Y_ode));
 
-    Yk_raw = Y_ode(k,:)';
+    for k = 1:n_steps
 
-    Pk_raw = stato_to_punti_locale(Yk_raw);
+        Yk_raw = Y_ode(k,:)';
 
-    % Raffinamento geometrico della stella
+        Pk_raw = stato_to_punti_locale(Yk_raw);
 
-    Pk_ref = refine_mesh_v3(Pk_raw, idx_v_interni);
+        % Raffinamento geometrico della stella
 
-    % ------------------------------------------------------------
-    % RAFFINAMENTO CAMERA OPZIONALE
-    % ------------------------------------------------------------
-    % Se vuoi visualizzare anche il vincolo della camera nel post-processing,
-    % decommenta la riga seguente.
-    %
-     [Pk_ref, ~] = refine_mesh_camera(Pk_ref, D_camera);
-    %
-    % ------------------------------------------------------------
+        Pk_ref = refine_mesh_v3(Pk_raw, idx_v_interni);
 
-    Y_ode_refined(k,:) = punti_to_stato_locale(Pk_ref)';
+        % ------------------------------------------------------------
+        % RAFFINAMENTO CAMERA OPZIONALE
+        % ------------------------------------------------------------
+        % Se vuoi visualizzare anche il vincolo della camera nel post-processing,
+        % decommenta la riga seguente.
+        %
+        [Pk_ref, ~] = refine_mesh_camera(Pk_ref, D_camera);
+        %
+        % ------------------------------------------------------------
 
-end
+        Y_ode_refined(k,:) = punti_to_stato_locale(Pk_ref)';
+
+    end
 
 
 %% ============================================================
@@ -395,18 +422,19 @@ end
 %% ============================================================
 
 
-%% ============================================================
-%  DEBUG RAFFINAMENTO
-% ============================================================
+    %% ============================================================
+    %  DEBUG RAFFINAMENTO
+    % ============================================================
 
-k_debug = round(length(t_ode)/2);
+    k_debug = round(length(t_ode)/2);
 
-Yk_raw = Y_ode(k_debug,:)';
-Yk_ref = Y_ode_refined(k_debug,:)';
+    Yk_raw = Y_ode(k_debug,:)';
+    Yk_ref = Y_ode_refined(k_debug,:)';
 
-fprintf("Norma correzione refine al passo k = %d: %.6e\n", ...
-    k_debug, norm(Yk_ref - Yk_raw));
+    fprintf("Norma correzione refine al passo k = %d: %.6e\n", ...
+        k_debug, norm(Yk_ref - Yk_raw));
 
+end
 
 %% ============================================================
 %  SELEZIONE DATI PER PLOT
@@ -751,21 +779,22 @@ plot(P_finale(:,1), P_finale(:,2), ...
     'k-', ...
     'LineWidth', 2.0, ...
     'DisplayName', 'Mesh finale');
+if type == "star"
 
-plot(P_finale(idx_v_interni,1), ...
-     P_finale(idx_v_interni,2), ...
-     'ro', ...
-     'MarkerSize', 8, ...
-     'LineWidth', 1.5, ...
-     'DisplayName','Punte interne finali');
+    plot(P_finale(idx_v_interni,1), ...
+         P_finale(idx_v_interni,2), ...
+        'ro', ...
+        'MarkerSize', 8, ...
+        'LineWidth', 1.5, ...
+        'DisplayName','Punte interne finali');
 
-plot(P_finale(idx_v_esterni,1), ...
-     P_finale(idx_v_esterni,2), ...
-     'gs', ...
-     'MarkerSize', 8, ...
-     'LineWidth', 1.5, ...
-     'DisplayName','Punte esterne finali');
-
+    plot(P_finale(idx_v_esterni,1), ...
+        P_finale(idx_v_esterni,2), ...
+        'gs', ...
+        'MarkerSize', 8, ...
+        'LineWidth', 1.5, ...
+        'DisplayName','Punte esterne finali');
+end
 % Camera in mm
 R_camera_mm = D_camera * 1e3 / 2;
 
@@ -886,19 +915,22 @@ h_mesh = plot(P_first(:,1), P_first(:,2), 'b-', ...
     'LineWidth', 1.8, ...
     'DisplayName', 'Mesh corrente');
 
-h_tips_int = plot(P_first(idx_v_interni,1), ...
+if type == "star"
+
+    h_tips_int = plot(P_first(idx_v_interni,1), ...
                   P_first(idx_v_interni,2), ...
                   'ro', ...
                   'MarkerSize', 7, ...
                   'LineWidth', 1.5, ...
                   'DisplayName', 'Punte interne');
 
-h_tips_ext = plot(P_first(idx_v_esterni,1), ...
+    h_tips_ext = plot(P_first(idx_v_esterni,1), ...
                   P_first(idx_v_esterni,2), ...
                   'gs', ...
                   'MarkerSize', 7, ...
                   'LineWidth', 1.5, ...
                   'DisplayName', 'Punte esterne');
+end
 
 h_time = text(0.02, 0.95, '', ...
     'Units', 'normalized', ...
@@ -917,6 +949,7 @@ for jj = 1:length(idx_anim)
     set(h_mesh, ...
         'XData', Pk(:,1), ...
         'YData', Pk(:,2));
+if type == "star"
 
     set(h_tips_int, ...
         'XData', Pk(idx_v_interni,1), ...
@@ -925,7 +958,7 @@ for jj = 1:length(idx_anim)
     set(h_tips_ext, ...
         'XData', Pk(idx_v_esterni,1), ...
         'YData', Pk(idx_v_esterni,2));
-
+end
     time_string = sprintf('t = %.3f s | p_c = %.2f bar', ...
         t_plot(k), p_plot(k)*1e-5);
 
@@ -1024,9 +1057,9 @@ function [value, isterminal, direction] = chamber_full_event(~, y, vars, plot_ca
 
     D_camera = vars.geometry.D_camera;
     R_camera = D_camera / 2;
-
-    idx_v_interni = vars.geometry.idx_v_interni;
-
+    if vars.geometry.type == "star"
+        idx_v_interni = vars.geometry.idx_v_interni;
+    end
     %% ============================================================
     %  1. RICOSTRUZIONE DELLA MESH DA CONTROLLARE
     % ============================================================
