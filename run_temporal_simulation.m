@@ -95,6 +95,8 @@ if isfield(pre, "CEA")
     T_fun_of_p = pre.CEA.T_fun_of_p;
     k_fun_of_p = pre.CEA.k_fun_of_p;
     R_fun_of_p = pre.CEA.R_fun_of_p;
+    dRTdOF_fun_of_p = pre.CEA.dRTdOF_fun_of_p;
+    dRTdp_fun_of_p = pre.CEA.dRTdp_fun_of_p;
 else
     cea = load("CEA_functions.mat");
     T_fun_of_p = cea.T_fun_of_p;
@@ -214,6 +216,9 @@ vars.combustion.mdot_ox = mox;
 vars.combustion.Tc_fun = T_fun_of_p;
 vars.combustion.R_fun = R_fun_of_p;
 vars.combustion.k_fun = k_fun_of_p;
+vars.combustion.dRTdOF_fun_OF_p = dRTdOF_fun_of_p;
+vars.combustion.dRTdp_fun_OF_p = dRTdp_fun_of_p;
+
 
 vars.combustion.OFmin = OFmin;
 vars.combustion.OFmax = OFmax;

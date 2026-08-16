@@ -74,6 +74,9 @@ cea = load("CEA_functions.mat");
 T_fun_of_p = cea.T_fun_of_p;
 k_fun_of_p = cea.k_fun_of_p;
 R_fun_of_p = cea.R_fun_of_p;
+dRTdOF_fun_of_p = cea.dRTdOF_fun_of_p;
+dRTdp_fun_of_p = cea.dRTdp_fun_of_p;
+
 
 %% ============================================================
 %  THERMODYNAMIC / NOZZLE PREDESIGN
@@ -379,5 +382,6 @@ end
 pre.CEA.T_fun_of_p = T_fun_of_p;
 pre.CEA.k_fun_of_p = k_fun_of_p;
 pre.CEA.R_fun_of_p = R_fun_of_p;
-
+pre.CEA.dRTdOF_fun_of_p = dRTdOF_fun_of_p;
+pre.CEA.dRTdp_fun_of_p = dRTdp_fun_of_p;
 end
