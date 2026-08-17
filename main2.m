@@ -4,22 +4,38 @@ clc;
 
 %% STEP 0: data
 
+tic;
+
 % ================= GEOMETRY DATA =================
 
-type = "star";
+load("prevars.mat");
 
-multiplyer = 100;
+if type == "star"
 
-vars.geometry.ntips = 10;
+    multiplyer = 80;
+    vars.geometry.ntips = n_tips; % da predesign
+    vars.geometry.diametro_est = diam_e;    % [m]   da predesign
+    vars.geometry.diametro_int = diam_i;     % [m]   da predesign
+    n = multiplyer * vars.geometry.ntips;
+
+else if type == "cylinder"
+       
+    n = 500;
+    vars.geometry.diametro = diam;
+
+else
+
+    frpintf("type non riconosciuto")
+
+end
+end
+
 
 % Mesh in SI: metri
-vars.geometry.diametro_est = 2.5e-2;    % [m]
-vars.geometry.diametro_int = 3.5e-2;     % [m]
 
 vars.geometry.cyl_tol_rel = 0.03;
 vars.geometry.cyl_tol_abs = 0.15e-3;   % 0.15 mm
 
-n = multiplyer * vars.geometry.ntips;
 
 % ================= FUEL DATA =================
 % FUEL: HTPB
@@ -35,7 +51,7 @@ a_rf = a_rf * 1e-3;           % [(m/s)/((kg/m^2 s)^n)]
 % ================= COMBUSTION DATA =================
 % OXIDIZER: O2
 
-mox = 0.015;                  % [kg/s]
+%mox = 0.015;                  % [kg/s]  da predesign
 
 load("CEA_functions.mat");
 
@@ -45,18 +61,18 @@ OFmax = 19.5;                 % [-]
 pmin = 101325;                % [Pa]
 pmax = 99e5;                  % [Pa]
 
-tmax = 10;                    % [s]
-pamb = 101325;                % [Pa]
+tmax = 400;                   % [s]
+pamb = 0;                     % [Pa]
 
 % ================= ENGINE DATA =================
 
-ext_diameter = 0.06;          % [m]
-chamber_length = 0.09;        % [m]
+ext_diameter = 280.1*2e-3;          % [m]
+chamber_length = L; %da predesign       % [m]
 
-throat_diameter = 0.005;       % [m]
-eps = 2;
+throat_diameter = 0.15;       % [m]
+%eps = 2; da predesign
 
-At = 0.25*pi*(throat_diameter^2);   % [m^2]
+%At = 0.25*pi*(throat_diameter^2);   % [m^2]
 
 % Camera coerente in SI
 D_camera = ext_diameter;      % [m]
@@ -73,28 +89,30 @@ D_camera = ext_diameter;      % [m]
 
 r_v = vecnorm(coord_mesh(idx_v,:), 2, 2);
 
-r_thr = 0.5 * (min(r_v) + max(r_v));
+if type == "star"
 
-idx_v_interni = idx_v(r_v < r_thr);
-idx_v_esterni = idx_v(r_v >= r_thr);
+    r_thr = 0.5 * (min(r_v) + max(r_v));
+    idx_v_interni = idx_v(r_v < r_thr);
+    idx_v_esterni = idx_v(r_v >= r_thr);
 
 
-%% ============================================================
-%  CHECK INDICI
-% ============================================================
+    %% ============================================================
+    %  CHECK INDICI
+    % ============================================================
 
-n_mesh = size(coord_mesh,1);
+    n_mesh = size(coord_mesh,1);
 
-fprintf("\nDEBUG MESH INIZIALE:\n");
-fprintf("n_mesh = %d\n", n_mesh);
-fprintf("max(idx_v) = %d\n", max(idx_v));
-fprintf("max(idx_v_interni) = %d\n", max(idx_v_interni));
-fprintf("max(idx_v_esterni) = %d\n", max(idx_v_esterni));
+    fprintf("\nDEBUG MESH INIZIALE:\n");
+    fprintf("n_mesh = %d\n", n_mesh);
+    fprintf("max(idx_v) = %d\n", max(idx_v));
+    fprintf("max(idx_v_interni) = %d\n", max(idx_v_interni));
+    fprintf("max(idx_v_esterni) = %d\n", max(idx_v_esterni));
 
-if max(idx_v) > n_mesh || max(idx_v_interni) > n_mesh || max(idx_v_esterni) > n_mesh
-    error("Indici punte non coerenti con coord_mesh.");
+    if max(idx_v) > n_mesh || max(idx_v_interni) > n_mesh || max(idx_v_esterni) > n_mesh
+        error("Indici punte non coerenti con coord_mesh.");
+    end
+
 end
-
 
 %% ============================================================
 %  OUTPUT MESH INIZIALE
@@ -105,27 +123,29 @@ plot(coord_mesh(:,1)*1e3, coord_mesh(:,2)*1e3, 'b.-', ...
     'DisplayName', 'mesh iniziale');
 hold on;
 
-plot(coord_mesh(idx_v,1)*1e3, coord_mesh(idx_v,2)*1e3, 'ko', ...
-     'MarkerSize', 8, ...
-     'LineWidth', 1.5, ...
-     'DisplayName', 'tutti i vertici');
+if type == "star"
+    plot(coord_mesh(idx_v,1)*1e3, coord_mesh(idx_v,2)*1e3, 'ko', ...
+        'MarkerSize', 8, ...
+        'LineWidth', 1.5, ...
+        'DisplayName', 'tutti i vertici');
 
-plot(coord_mesh(idx_v_interni,1)*1e3, coord_mesh(idx_v_interni,2)*1e3, 'ro', ...
-     'MarkerSize', 10, ...
-     'LineWidth', 2, ...
-     'DisplayName', 'punte interne');
+    plot(coord_mesh(idx_v_interni,1)*1e3, coord_mesh(idx_v_interni,2)*1e3, 'ro', ...
+        'MarkerSize', 10, ...
+        'LineWidth', 2, ...
+        'DisplayName', 'punte interne');
 
-plot(coord_mesh(idx_v_esterni,1)*1e3, coord_mesh(idx_v_esterni,2)*1e3, 'gs', ...
-     'MarkerSize', 8, ...
-     'LineWidth', 1.5, ...
-     'DisplayName', 'punte esterne');
+    plot(coord_mesh(idx_v_esterni,1)*1e3, coord_mesh(idx_v_esterni,2)*1e3, 'gs', ...
+        'MarkerSize', 8, ...
+        'LineWidth', 1.5, ...
+        'DisplayName', 'punte esterne');
+end 
 
 axis equal;
 grid on;
 legend('Location','best');
 xlabel('x [mm]');
 ylabel('y [mm]');
-title('Controllo indici vertici');
+title('mesh iniziale');
 
 
 %% ============================================================
@@ -133,6 +153,14 @@ title('Controllo indici vertici');
 % ============================================================
 
 [perim0, Ap0] = eval_mesh(coord_mesh, "cartesian");
+
+tol=1e-4;
+if Ap-Ap0>tol
+    fprintf("L'area di porto del main2 e del predesign non corrispondono")
+    return
+end
+
+%CHECK SU PERIM0 E AP0 controlla coerenza con predesign
 
 fprintf("\nGeometria iniziale:\n");
 fprintf("perimeter = %.6e m\n", perim0);
@@ -148,6 +176,34 @@ fprintf("regressione stimata in tmax = %.6e m = %.6f mm\n", ...
     rf_test*tmax, rf_test*tmax*1e3);
 
 
+%% === DIMENSIONAMENTO AREA DI GOLA IN BASE ALLA PRESSIONE ===
+pc_target_bar = pch_bar;               % [bar] INSERISCI QUI LA TUA PRESSIONE INIZIALE VOLUTA
+pc_target = pc_target_bar * 1e5;  % [Pa]
+
+% 1. Calcolo del flusso iniziale (indipendente dalla pressione)
+Gox0 = mox / Ap0;
+rf0 = a_rf * Gox0^n_rf;
+Ab0 = perim0 * chamber_length;
+mdot_f0 = rho_f * Ab0 * rf0;
+
+% 2. Portata totale e rapporto di miscela
+mdot_tot = mox + mdot_f0;
+OF0 = mox / mdot_f0;
+
+% 3. Calcolo del c* (usando le funzioni CEA interpolate alla pressione target)
+Tc0 = T_fun_of_p(OF0, pc_target_bar);
+k0 = k_fun_of_p(OF0, pc_target_bar);
+R0 = R_fun_of_p(OF0, pc_target_bar);
+
+% Formula del coefficiente di Vandenkerckhove (al quadrato)
+K2 = k0 * ((2/(k0+1))^((k0+1)/(k0-1))); 
+cstar0 = sqrt(R0 * Tc0 / K2);
+
+% 4. Area e diametro di gola
+At = (mdot_tot * cstar0) / pc_target;
+throat_diameter = 2 * sqrt(At / pi);
+
+
 %% Compact data in vars
 
 % geometry
@@ -155,13 +211,17 @@ vars.geometry.port_area = Ap0;
 vars.geometry.burning_perimeter = perim0;
 vars.geometry.grain_length = chamber_length;
 vars.geometry.throat_area = At;
+vars.geometry.type = type;
 
-vars.geometry.idx_v = idx_v;
-vars.geometry.idx_v_interni = idx_v_interni;
-vars.geometry.idx_v_esterni = idx_v_esterni;
+if type == "star"
+    vars.geometry.idx_v = idx_v;
+    vars.geometry.idx_v_interni = idx_v_interni;
+    vars.geometry.idx_v_esterni = idx_v_esterni;
+end
+
 vars.geometry.D_camera = D_camera;
 vars.geometry.type = type;
-vars.geometry.wall_tol = 1e-10 * D_camera;
+vars.geometry.wall_tol = 1e-3 * D_camera;
 
 % fuel
 vars.fuel.a_rf = a_rf;
@@ -173,6 +233,8 @@ vars.combustion.mdot_ox = mox;
 vars.combustion.Tc_fun = T_fun_of_p;
 vars.combustion.R_fun = R_fun_of_p;
 vars.combustion.k_fun = k_fun_of_p;
+vars.combustion.dRTdOF_fun_OF_p = dRTdOF_fun_of_p;
+vars.combustion.dRTdp_fun_OF_p = dRTdp_fun_of_p;
 
 vars.combustion.OFmin = OFmin;
 vars.combustion.OFmax = OFmax;
@@ -220,10 +282,14 @@ fprintf("\tO/F      = %.2f\n", OF0);
 %  STEP 3: INTEGRATE COUPLED CHAMBER + MESH SYSTEM
 % ============================================================
 
-fine_ode_boolean = false;
+fine_ode_boolean = true;
 
 plot_case = "refined";
 % plot_case = "ode45";
+
+if type == "star"
+    plot_case="refined";
+end
 
 Y0 = [coord_mesh(:,1); coord_mesh(:,2)];
 
@@ -238,7 +304,7 @@ t0 = 0;
 tf = tmax;
 
 % Forzo output temporali regolari, così i plot mostrano davvero più istanti
-n_output = 10;
+n_output = 8;
 tspan = linspace(t0, tf, n_output);
 
 odefun = @(t,y) ode_coupled( ...
@@ -274,33 +340,35 @@ Y_ode  = y_in_time(:,2:end);  % mesh grezza nel tempo
 % se vuoi includere anche il vincolo della camera nel post-processing,
 % decommenta le righe indicate dentro il ciclo.
 
-n_steps = length(t_ode);
+if plot_case == "refined"
 
-Y_ode_refined = zeros(size(Y_ode));
+    n_steps = length(t_ode);
 
-for k = 1:n_steps
+    Y_ode_refined = zeros(size(Y_ode));
 
-    Yk_raw = Y_ode(k,:)';
+    for k = 1:n_steps
 
-    Pk_raw = stato_to_punti_locale(Yk_raw);
+        Yk_raw = Y_ode(k,:)';
 
-    % Raffinamento geometrico della stella
+        Pk_raw = stato_to_punti_locale(Yk_raw);
 
-    Pk_ref = refine_mesh_v3(Pk_raw, idx_v_interni);
+        % Raffinamento geometrico della stella
 
-    % ------------------------------------------------------------
-    % RAFFINAMENTO CAMERA OPZIONALE
-    % ------------------------------------------------------------
-    % Se vuoi visualizzare anche il vincolo della camera nel post-processing,
-    % decommenta la riga seguente.
-    %
-     [Pk_ref, ~] = refine_mesh_camera(Pk_ref, D_camera);
-    %
-    % ------------------------------------------------------------
+        Pk_ref = refine_mesh_v3(Pk_raw, idx_v_interni);
 
-    Y_ode_refined(k,:) = punti_to_stato_locale(Pk_ref)';
+        % ------------------------------------------------------------
+        % RAFFINAMENTO CAMERA OPZIONALE
+        % ------------------------------------------------------------
+        % Se vuoi visualizzare anche il vincolo della camera nel post-processing,
+        % decommenta la riga seguente.
+        %
+        [Pk_ref, ~] = refine_mesh_camera(Pk_ref, D_camera);
+        %
+        % ------------------------------------------------------------
 
-end
+        Y_ode_refined(k,:) = punti_to_stato_locale(Pk_ref)';
+
+    end
 
 
 %% ============================================================
@@ -354,18 +422,19 @@ end
 %% ============================================================
 
 
-%% ============================================================
-%  DEBUG RAFFINAMENTO
-% ============================================================
+    %% ============================================================
+    %  DEBUG RAFFINAMENTO
+    % ============================================================
 
-k_debug = round(length(t_ode)/2);
+    k_debug = round(length(t_ode)/2);
 
-Yk_raw = Y_ode(k_debug,:)';
-Yk_ref = Y_ode_refined(k_debug,:)';
+    Yk_raw = Y_ode(k_debug,:)';
+    Yk_ref = Y_ode_refined(k_debug,:)';
 
-fprintf("Norma correzione refine al passo k = %d: %.6e\n", ...
-    k_debug, norm(Yk_ref - Yk_raw));
+    fprintf("Norma correzione refine al passo k = %d: %.6e\n", ...
+        k_debug, norm(Yk_ref - Yk_raw));
 
+end
 
 %% ============================================================
 %  SELEZIONE DATI PER PLOT
@@ -409,18 +478,31 @@ fprintf("\nNumero punti usati per il plot = %d\n", n_common);
 
 
 %% ============================================================
-%  CALCOLO AREA, PERIMETRO E GOX NEL TEMPO
+%  CALCOLO AREA, PERIMETRO, GOX, RF, MDOT_F E O/F NEL TEMPO
 % ============================================================
 
 n_steps_geom = size(Y_plot, 1);
 
-area_t_m2 = zeros(n_steps_geom, 1);
-area_t_mm2 = zeros(n_steps_geom, 1);
+area_t_m2 = NaN(n_steps_geom, 1);
+area_t_mm2 = NaN(n_steps_geom, 1);
 
-perimetro_t_m = zeros(n_steps_geom, 1);
-perimetro_t_mm = zeros(n_steps_geom, 1);
+perimetro_t_m = NaN(n_steps_geom, 1);
+perimetro_t_mm = NaN(n_steps_geom, 1);
 
-Gox_t = zeros(n_steps_geom, 1);
+Gox_t = NaN(n_steps_geom, 1);
+rf_t = NaN(n_steps_geom, 1);
+
+Ab_t = NaN(n_steps_geom, 1);
+mdot_f_t = NaN(n_steps_geom, 1);
+mdot_in_t = NaN(n_steps_geom, 1);
+
+OF_t = NaN(n_steps_geom, 1);
+
+L      = vars.geometry.grain_length;
+mox    = vars.combustion.mdot_ox;
+a_rf   = vars.fuel.a_rf;
+n_rf   = vars.fuel.n_rf;
+rho_f  = vars.fuel.rho_f;
 
 for k = 1:n_steps_geom
 
@@ -432,10 +514,30 @@ for k = 1:n_steps_geom
     perimetro_t_mm(k) = perimetro_t_m(k) * 1e3;
     area_t_mm2(k) = area_t_m2(k) * 1e6;
 
-    if area_t_m2(k) > 0
+    if area_t_m2(k) > 0 && perimetro_t_m(k) > 0
+
+        % Flusso ossidante
         Gox_t(k) = mox / area_t_m2(k);
-    else
-        Gox_t(k) = NaN;
+
+        % Velocità di regressione
+        rf_t(k) = a_rf * Gox_t(k)^n_rf;
+
+        % Area bruciante
+        Ab_t(k) = perimetro_t_m(k) * L;
+
+        % Portata di fuel
+        mdot_f_t(k) = rho_f * Ab_t(k) * rf_t(k);
+
+        % Portata totale entrante
+        mdot_in_t(k) = mdot_f_t(k) + mox;
+
+        % Rapporto ossidante/fuel
+        if mdot_f_t(k) > 0
+            OF_t(k) = mox / mdot_f_t(k);
+        else
+            OF_t(k) = NaN;
+        end
+
     end
 
 end
@@ -501,6 +603,86 @@ ylabel('G_{ox} [kg/(m^2 s)]');
 title("Evoluzione G_{ox} - caso " + plot_label);
 legend('Location', 'best');
 
+
+%% ============================================================
+%  PLOT EVOLUZIONE O/F
+% ============================================================
+
+figure;
+hold on;
+grid on;
+
+plot(t_plot, OF_t, ...
+    'LineWidth', 1.8, ...
+    'DisplayName', 'O/F');
+
+if isfield(vars.combustion, "OFmin")
+    yline(vars.combustion.OFmin, 'k--', ...
+        'LineWidth', 1.2, ...
+        'DisplayName', 'O/F min CEA');
+end
+
+if isfield(vars.combustion, "OFmax")
+    yline(vars.combustion.OFmax, 'k--', ...
+        'LineWidth', 1.2, ...
+        'DisplayName', 'O/F max CEA');
+end
+
+xlabel('Tempo [s]');
+ylabel('O/F [-]');
+title("Evoluzione O/F - caso " + plot_label);
+legend('Location', 'best');
+
+
+%% ============================================================
+%  PLOT CONFRONTO GOX E O/F
+% ============================================================
+
+figure;
+hold on;
+grid on;
+
+yyaxis left
+plot(t_plot, Gox_t, ...
+    'LineWidth', 1.8, ...
+    'DisplayName', 'G_{ox}');
+ylabel('G_{ox} [kg/(m^2 s)]');
+
+yyaxis right
+plot(t_plot, OF_t, ...
+    'LineWidth', 1.8, ...
+    'DisplayName', 'O/F');
+ylabel('O/F [-]');
+
+xlabel('Tempo [s]');
+title("Confronto G_{ox} e O/F - caso " + plot_label);
+legend('Location', 'best');
+
+
+%% ============================================================
+%  PLOT EVOLUZIONE PORTATE
+% ============================================================
+
+figure;
+hold on;
+grid on;
+
+plot(t_plot, mox*ones(size(t_plot)), ...
+    'LineWidth', 1.8, ...
+    'DisplayName', '\dot{m}_{ox}');
+
+plot(t_plot, mdot_f_t, ...
+    'LineWidth', 1.8, ...
+    'DisplayName', '\dot{m}_{f}');
+
+plot(t_plot, mdot_in_t, ...
+    'LineWidth', 1.8, ...
+    'DisplayName', '\dot{m}_{in}');
+
+xlabel('Tempo [s]');
+ylabel('Portata [kg/s]');
+title("Evoluzione portate - caso " + plot_label);
+legend('Location', 'best');
 
 %% ============================================================
 %  PLOT VARIAZIONE GLOBALE MESH
@@ -597,21 +779,22 @@ plot(P_finale(:,1), P_finale(:,2), ...
     'k-', ...
     'LineWidth', 2.0, ...
     'DisplayName', 'Mesh finale');
+if type == "star"
 
-plot(P_finale(idx_v_interni,1), ...
-     P_finale(idx_v_interni,2), ...
-     'ro', ...
-     'MarkerSize', 8, ...
-     'LineWidth', 1.5, ...
-     'DisplayName','Punte interne finali');
+    plot(P_finale(idx_v_interni,1), ...
+         P_finale(idx_v_interni,2), ...
+        'ro', ...
+        'MarkerSize', 8, ...
+        'LineWidth', 1.5, ...
+        'DisplayName','Punte interne finali');
 
-plot(P_finale(idx_v_esterni,1), ...
-     P_finale(idx_v_esterni,2), ...
-     'gs', ...
-     'MarkerSize', 8, ...
-     'LineWidth', 1.5, ...
-     'DisplayName','Punte esterne finali');
-
+    plot(P_finale(idx_v_esterni,1), ...
+        P_finale(idx_v_esterni,2), ...
+        'gs', ...
+        'MarkerSize', 8, ...
+        'LineWidth', 1.5, ...
+        'DisplayName','Punte esterne finali');
+end
 % Camera in mm
 R_camera_mm = D_camera * 1e3 / 2;
 
@@ -732,19 +915,22 @@ h_mesh = plot(P_first(:,1), P_first(:,2), 'b-', ...
     'LineWidth', 1.8, ...
     'DisplayName', 'Mesh corrente');
 
-h_tips_int = plot(P_first(idx_v_interni,1), ...
+if type == "star"
+
+    h_tips_int = plot(P_first(idx_v_interni,1), ...
                   P_first(idx_v_interni,2), ...
                   'ro', ...
                   'MarkerSize', 7, ...
                   'LineWidth', 1.5, ...
                   'DisplayName', 'Punte interne');
 
-h_tips_ext = plot(P_first(idx_v_esterni,1), ...
+    h_tips_ext = plot(P_first(idx_v_esterni,1), ...
                   P_first(idx_v_esterni,2), ...
                   'gs', ...
                   'MarkerSize', 7, ...
                   'LineWidth', 1.5, ...
                   'DisplayName', 'Punte esterne');
+end
 
 h_time = text(0.02, 0.95, '', ...
     'Units', 'normalized', ...
@@ -763,6 +949,7 @@ for jj = 1:length(idx_anim)
     set(h_mesh, ...
         'XData', Pk(:,1), ...
         'YData', Pk(:,2));
+if type == "star"
 
     set(h_tips_int, ...
         'XData', Pk(idx_v_interni,1), ...
@@ -771,7 +958,7 @@ for jj = 1:length(idx_anim)
     set(h_tips_ext, ...
         'XData', Pk(idx_v_esterni,1), ...
         'YData', Pk(idx_v_esterni,2));
-
+end
     time_string = sprintf('t = %.3f s | p_c = %.2f bar', ...
         t_plot(k), p_plot(k)*1e-5);
 
@@ -782,7 +969,7 @@ for jj = 1:length(idx_anim)
 
 end
 
-
+toc
 %% ============================================================
 %  FUNZIONE LOCALE: STATO -> PUNTI
 % ============================================================
@@ -870,9 +1057,9 @@ function [value, isterminal, direction] = chamber_full_event(~, y, vars, plot_ca
 
     D_camera = vars.geometry.D_camera;
     R_camera = D_camera / 2;
-
-    idx_v_interni = vars.geometry.idx_v_interni;
-
+    if vars.geometry.type == "star"
+        idx_v_interni = vars.geometry.idx_v_interni;
+    end
     %% ============================================================
     %  1. RICOSTRUZIONE DELLA MESH DA CONTROLLARE
     % ============================================================
@@ -881,16 +1068,18 @@ function [value, isterminal, direction] = chamber_full_event(~, y, vars, plot_ca
 
         case "refined"
 
-            % Uso la stessa mesh che poi vai a considerare fisicamente
-            P_check = refine_mesh_v3(P_raw, idx_v_interni);
+    % Prima correzione sulla mesh grezza
+    [P_raw, ~] = refine_mesh_camera(P_raw, D_camera);
 
-            % Se hai già attiva una logica cilindrica in ode_coupled,
-            % puoi anche decidere di non raffinare quando la geometria
-            % è quasi cilindrica. Per ora tengo la versione semplice.
+    % Raffinamento
+    P_check = refine_mesh_v3(P_raw, idx_v_interni);
+
+    % Seconda correzione dopo il raffinamento
+    [P_check, ~] = refine_mesh_camera(P_check, D_camera);
 
         case "ode45"
 
-            P_check = P_raw;
+    [P_check, ~] = refine_mesh_camera(P_raw, D_camera);
 
         otherwise
 
@@ -910,7 +1099,7 @@ function [value, isterminal, direction] = chamber_full_event(~, y, vars, plot_ca
     if isfield(vars.geometry, "wall_event_tol")
         wall_event_tol = vars.geometry.wall_event_tol;
     else
-        wall_event_tol = 1e-6;   % [m] = 0.001 mm
+        wall_event_tol = 1e-3;   % [m] = 0.001 mm
     end
 
     % Voglio fermarmi quando anche il punto più interno è arrivato

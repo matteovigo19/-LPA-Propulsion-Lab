@@ -35,10 +35,18 @@ At = vars.geometry.throat_area;
 D_camera = vars.geometry.D_camera;
 R_camera = D_camera / 2;
 
-idx_v         = vars.geometry.idx_v;
-idx_v_esterni = vars.geometry.idx_v_esterni;
-idx_v_interni = vars.geometry.idx_v_interni;
+type = vars.geometry.type;
 
+if type == "star"
+
+    idx_v         = vars.geometry.idx_v;
+    idx_v_esterni = vars.geometry.idx_v_esterni;
+    idx_v_interni = vars.geometry.idx_v_interni;
+else 
+    idx_v         = [];
+    idx_v_esterni = [];
+    idx_v_interni = [];
+end
 % fuel
 a_rf  = vars.fuel.a_rf;
 n_rf  = vars.fuel.n_rf;
@@ -81,17 +89,22 @@ rf = a_rf * Gox_raw^n_rf;
 %
 % In quel caso le vecchie punte interne non devono più essere trattate
 % come intersezioni di due lati regrediti.
+if type == "star"
 
-is_cylindrical = is_quasi_cylindrical_geometry( ...
-    P_raw, ...
-    idx_v_esterni, ...
-    idx_v_interni, ...
-    vars);
+    is_cylindrical = is_quasi_cylindrical_geometry( ...
+        P_raw, ...
+        idx_v_esterni, ...
+        idx_v_interni, ...
+        vars);
 
-if is_cylindrical
-    mesh_mode = "cylindrical";
-else
-    mesh_mode = "star";
+    if is_cylindrical
+        mesh_mode = "cylindrical";
+    else
+        mesh_mode = "star";
+    end
+else if type == "cylinder"
+        mesh_mode = "cylindrical";
+end
 end
 
 %% ============================================================
@@ -259,8 +272,7 @@ dY_eval = ode_mesh_v4(0, Y_eval, idx_v_interni, rf, mesh_mode);
 % Coerenza anche per il calcolo di dA/dt e dP/dt
 dY_eval = freeze_points_on_camera(Y_eval, dY_eval, D_camera);
 
-[d_perim_perim, d_area_area, dperimeter, darea] = ...
-    ode_eval_mesh(Y_eval, dY_eval);
+[d_perim_perim, d_area_area] = ode_eval_mesh_1(Y, dY);
 
 %% ============================================================
 %  10. EQUAZIONE PRESSIONE CAMERA
