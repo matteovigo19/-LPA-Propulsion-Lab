@@ -6,7 +6,7 @@ function sim = run_temporal_simulation(pre, settings)
 %   pre       output di run_predesign
 %
 %   settings  struct opzionale con campi:
-%       .tmax               [s]    default 300
+%       .tmax               [s]    default 400
 %       .ext_diameter       [m]    default 280.1*2e-3
 %       .multiplyer         [-]    default 80 per star
 %       .n_cylinder         [-]    default 500
@@ -36,7 +36,7 @@ end
 %  SETTINGS
 % ============================================================
 
-settings = set_default(settings, "tmax", 300);
+settings = set_default(settings, "tmax", 400);
 settings = set_default(settings, "ext_diameter", 280.1*2e-3);
 settings = set_default(settings, "multiplyer", 80);
 settings = set_default(settings, "n_cylinder", 500);
@@ -95,8 +95,6 @@ if isfield(pre, "CEA")
     T_fun_of_p = pre.CEA.T_fun_of_p;
     k_fun_of_p = pre.CEA.k_fun_of_p;
     R_fun_of_p = pre.CEA.R_fun_of_p;
-    dRTdOF_fun_of_p = pre.CEA.dRTdOF_fun_of_p;
-    dRTdp_fun_of_p = pre.CEA.dRTdp_fun_of_p;
 else
     cea = load("CEA_functions.mat");
     T_fun_of_p = cea.T_fun_of_p;
@@ -111,7 +109,7 @@ pmin = 101325;
 pmax = 99e5;
 
 tmax = settings.tmax;
-pamb = 0; 
+pamb = 0; %#ok<NASGU>
 
 % ---------------- ENGINE DATA ----------------
 
@@ -216,9 +214,6 @@ vars.combustion.mdot_ox = mox;
 vars.combustion.Tc_fun = T_fun_of_p;
 vars.combustion.R_fun = R_fun_of_p;
 vars.combustion.k_fun = k_fun_of_p;
-vars.combustion.dRTdOF_fun_OF_p = dRTdOF_fun_of_p;
-vars.combustion.dRTdp_fun_OF_p = dRTdp_fun_of_p;
-
 
 vars.combustion.OFmin = OFmin;
 vars.combustion.OFmax = OFmax;
@@ -374,6 +369,93 @@ for k = 1:n_steps_geom
 end
 
 %% ============================================================
+%  THRUST, THRUST MEDIO E IMPULSO TOTALE
+% ============================================================
+
+% Area di uscita ugello
+Ae = pre.eps * At;
+
+% Pressione ambiente
+pamb = 0;   % [Pa]
+
+% Inizializzazione
+thrust_t = NaN(n_steps_geom,1);
+
+for k = 1:n_steps_geom
+
+    pc = p_plot(k);          % [Pa]
+    pc_bar = pc * 1e-5;      % [bar]
+    OFk = OF_t(k);           % [-]
+
+    if ~isfinite(pc) || ~isfinite(OFk) || pc <= 0
+        continue
+    end
+
+    % Proprietà termodinamiche correnti da CEA
+    Tc = T_fun_of_p(OFk, pc_bar);
+    gamma = k_fun_of_p(OFk, pc_bar);
+    Rgas = R_fun_of_p(OFk, pc_bar);
+
+    % Coefficiente di Vandenkerckhove e c*
+    K2_thrust = gamma * ...
+        ((2/(gamma+1))^((gamma+1)/(gamma-1)));
+
+    cstar = sqrt(Rgas * Tc / K2_thrust);
+
+    % Portata uscente dalla gola:
+    % c* = pc*At/mdot_out
+    mdot_out = pc * At / cstar;
+
+    % Mach in uscita dall'ugello
+    eps_fun = @(Me) ...
+        1./Me .* sqrt( ...
+        ((1 + 0.5*(gamma-1).*Me.^2)/(0.5*(gamma+1))) ...
+        .^((gamma+1)/(gamma-1)));
+
+    Me = fzero(@(Me) pre.eps - eps_fun(Me), 2);
+
+    % Pressione e temperatura in uscita
+    pe = pc / ...
+        ((1 + 0.5*(gamma-1)*Me^2)^(gamma/(gamma-1)));
+
+    Te = Tc / ...
+        (1 + 0.5*(gamma-1)*Me^2);
+
+    % Velocità in uscita
+    ae = sqrt(gamma * Rgas * Te);
+    ue = Me * ae;
+
+    % Spinta istantanea
+    thrust_t(k) = ...
+        mdot_out * ue + ...
+        (pe - pamb) * Ae;
+
+end
+
+% Tengo solo i punti validi
+idx_valid_thrust = isfinite(thrust_t) & isfinite(t_plot);
+
+if nnz(idx_valid_thrust) >= 2
+
+    t_thrust = t_plot(idx_valid_thrust);
+    thrust_valid = thrust_t(idx_valid_thrust);
+
+    % Impulso totale [N s]
+    total_impulse = trapz(t_thrust, thrust_valid);
+
+    % Spinta media [N]
+    thrust_mean = total_impulse / ...
+        (t_thrust(end) - t_thrust(1));
+
+else
+
+    total_impulse = NaN;
+    thrust_mean = NaN;
+
+end
+
+
+%% ============================================================
 %  OUTPUT STRUCT
 % ============================================================
 
@@ -421,6 +503,11 @@ sim.mdot_ox = mox*ones(size(t_plot));
 sim.mdot_in = mdot_in_t;
 sim.OF = OF_t;
 
+% thrust e impulso
+sim.thrust = thrust_t;                 % [N]
+sim.thrust_mean = thrust_mean;         % [N]
+sim.total_impulse = total_impulse;     % [N s]
+
 sim.delta_mesh = delta_mesh;
 
 sim.t_event = t_event;
@@ -454,6 +541,8 @@ if settings.verbose
     fprintf("Perimetro finale = %.6e m\n", perimetro_t_m(end));
     fprintf("Gox finale = %.6f kg/(m^2 s)\n", Gox_t(end));
     fprintf("O/F finale = %.6f\n", OF_t(end));
+    fprintf("Spinta media = %.6f N\n", thrust_mean);
+    fprintf("Impulso totale = %.6e N s\n", total_impulse);
 
 end
 
