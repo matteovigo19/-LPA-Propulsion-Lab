@@ -44,7 +44,8 @@ end
 dx = diff(x);
 dy = diff(y);
 
-perimeter = sum(hypot(dx, dy));
+perimeter = 2*(sum(hypot(dx, dy)) - abs(x(1)-x(end-1)));
+
 
 %% AREA (shoelace formula)
 
@@ -55,6 +56,6 @@ for i = 1:length(x)-1
         (x(i)*y(i+1) - y(i)*x(i+1));
 end
 
-area = 0.5 * abs(area_sum);
+area = abs(area_sum);
 
 end
