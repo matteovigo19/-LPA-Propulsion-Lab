@@ -46,25 +46,54 @@ design.n_rf = 0.75;
 % ============================================================
 
 % "star" oppure "cylinder"
-design.type = "cylinder";
+design.type = "star";
+
+% ============================================================
+% SCELTA FUNZIONE OBIETTIVO
+%
+%   "impulse" -> massimizza l'impulso totale
+%   "shift"   -> minimizza gli shift relativi di O/F e GOX
+% ============================================================
+
+design.opt = "shift";
+
+% ============================================================
+% OUTPUT E PLOT
+%
+% Questi booleani sono indipendenti da design.opt.
+% Quindi è possibile ottimizzare una metrica e stampare/plottare
+% anche l'altra.
+% ============================================================
+
+show_impulse_output = true;
+show_impulse_plots  = true;
+
+show_shift_output = true;
+show_shift_plots  = true;
 
 %% ============================================================
 %  4. LIMITI VARIABILI DI OTTIMIZZAZIONE
 % ============================================================
 
-OF_min = 1.1;
-OF_max_global = 2.0;
+% 2.2 -> 5  star
 
-% SOLO STAR: massimo O/F iniziale dipendente dal numero di punte.
+OF_min = 2.2;
+OF_max_global = 5;
+
+% SOLO STAR: hn-òpopmassimo O/F iniziale dipendente dal numero di punte.
 OF_max_by_tips = containers.Map( ...
     [7, 8, 9, 10, 12, 14], ...
     [3.7, 3.4, 3.1, 2.7, 2.4, 2.1]);
 
-GOX_min = 300;
-GOX_max = 800;
+GOX_min = 500;
+GOX_max = 700;
 
 thrust_min = 45000;
 thrust_max = 55000;
+
+% pesi shift
+w_OF  = 0.5;
+w_GOX = 0.5;
 
 % SOLO STAR
 radius_factor_min = 0.5;
@@ -72,7 +101,7 @@ radius_factor_max = 0.8;
 
 % SOLO STAR
 n_tips_min = 4;
-n_tips_max = 4;
+n_tips_max = 8;
 n_tips_values = n_tips_min:n_tips_max;
 
 %% ============================================================
@@ -89,7 +118,7 @@ settings.multiplyer = 10;
 
 % CYLINDER
 settings.n_cylinder = 70;
-
+  
 settings.RelTol = 1e-8;
 settings.AbsTol = 1e-10;
 settings.fine_ode_boolean = false;
@@ -135,7 +164,7 @@ options = optimoptions( ...
 
 rng("shuffle");
 
-n_guess = 20;
+n_guess = 5;
 results = struct([]);
 
 %% ============================================================
@@ -180,6 +209,7 @@ switch lower(string(design.type))
             fprintf("\n");
             fprintf("=====================================================\n");
             fprintf("       OTTIMIZZAZIONE STAR - %d PUNTE\n", n_tips);
+            fprintf("       OBIETTIVO: %s\n", upper(string(design.opt)));
             fprintf("=====================================================\n");
 
             best_fval_local = Inf;
@@ -210,8 +240,13 @@ switch lower(string(design.type))
 
                 geometry_id = n_tips;
 
-                objective = @(x) objective_function( ...
-                    x, geometry_id, design, settings);
+                objective = make_objective( ...
+                    design.opt, ...
+                    geometry_id, ...
+                    design, ...
+                    settings, ...
+                    w_OF, ...
+                    w_GOX);
 
                 nonlcon = @(x) optimization_constraints( ...
                     x, geometry_id, design, settings, ...
@@ -243,7 +278,7 @@ switch lower(string(design.type))
                 fprintf("Radius factor   = %.6f\n", x_opt(4));
                 fprintf("Thrust medio    = %.6f N\n", sim_opt.thrust_mean);
                 fprintf("Impulso totale  = %.6e N s\n", sim_opt.total_impulse);
-                fprintf("fval            = %.6e\n", fval);
+                fprintf("J (%s)          = %.6e\n", upper(string(design.opt)), fval);
 
                 if fval < best_fval_local
 
@@ -326,6 +361,7 @@ switch lower(string(design.type))
         fprintf("\n");
         fprintf("=====================================================\n");
         fprintf("          OTTIMIZZAZIONE CYLINDER\n");
+        fprintf("          OBIETTIVO: %s\n", upper(string(design.opt)));
         fprintf("=====================================================\n");
 
         best_fval_local = Inf;
@@ -335,6 +371,17 @@ switch lower(string(design.type))
         best_output_local = [];
         best_pre_local = [];
         best_sim_local = [];
+
+        % =====================================================
+        %  SALVATAGGIO RISULTATI DI TUTTI I GUESS - CYLINDER
+        %
+        %  Servono per confrontare l'andamento dei parametri
+        %  ottimizzati e dell'impulso totale tra i vari guess.
+        % =====================================================
+
+        cylinder_guess_OF = NaN(n_guess,1);
+        cylinder_guess_GOX = NaN(n_guess,1);
+        cylinder_guess_impulse = NaN(n_guess,1);
 
         for jj = 1:n_guess
 
@@ -354,8 +401,13 @@ switch lower(string(design.type))
 
             geometry_id = [];
 
-            objective = @(x) objective_function( ...
-                x, geometry_id, design, settings);
+            objective = make_objective( ...
+                design.opt, ...
+                geometry_id, ...
+                design, ...
+                settings, ...
+                w_OF, ...
+                w_GOX);
 
             nonlcon = @(x) optimization_constraints( ...
                 x, geometry_id, design, settings, ...
@@ -364,7 +416,7 @@ switch lower(string(design.type))
                 pc_sim_min, pc_sim_max);
 
             [x_opt, fval, exitflag, output] = fmincon( ...
-                objective, ...
+                objective, ... 
                 x0, ...
                 [], [], [], [], ...
                 lb_local, ...
@@ -380,13 +432,21 @@ switch lower(string(design.type))
             sim_opt = run_temporal_simulation( ...
                 pre_opt, settings);
 
+            % =================================================
+            % Salvataggio del risultato di questo guess
+            % =================================================
+
+            cylinder_guess_OF(jj) = x_opt(1);
+            cylinder_guess_GOX(jj) = x_opt(2);
+            cylinder_guess_impulse(jj) = sim_opt.total_impulse;
+
             fprintf("\nRisultato guess %d:\n", jj);
             fprintf("O/F             = %.6f\n", x_opt(1));
             fprintf("GOX             = %.6f kg/(m^2 s)\n", x_opt(2));
             fprintf("Thrust iniziale = %.6f N\n", x_opt(3));
             fprintf("Thrust medio    = %.6f N\n", sim_opt.thrust_mean);
             fprintf("Impulso totale  = %.6e N s\n", sim_opt.total_impulse);
-            fprintf("fval            = %.6e\n", fval);
+            fprintf("J (%s)          = %.6e\n", upper(string(design.opt)), fval);
 
             if fval < best_fval_local
 
@@ -423,6 +483,11 @@ switch lower(string(design.type))
         results(1).pre = best_pre_local;
         results(1).sim = best_sim_local;
 
+        % Risultati di tutti i guess del cilindro
+        results(1).guess_OF = cylinder_guess_OF;
+        results(1).guess_GOX = cylinder_guess_GOX;
+        results(1).guess_impulse = cylinder_guess_impulse;
+
         fprintf("\n");
         fprintf("=====================================================\n");
         fprintf(" MIGLIOR RISULTATO CYLINDER SU %d GUESS\n", n_guess);
@@ -447,13 +512,18 @@ end
 
 %% ============================================================
 %  10. CONFIGURAZIONE MIGLIORE
+%
+%  La configurazione migliore è quella che minimizza la funzione
+%  obiettivo selezionata in design.opt.
 % ============================================================
 
-impulses = [results.total_impulse];
+objective_values = [results.fval];
 
-[best_impulse, idx_best] = max(impulses);
+[best_objective, idx_best] = min(objective_values);
 
 best = results(idx_best);
+
+best_impulse = best.total_impulse;
 
 
 %% ============================================================
@@ -466,6 +536,8 @@ fprintf("             CONFIGURAZIONE MIGLIORE\n");
 fprintf("=====================================================\n");
 
 fprintf("Geometria             = %s\n", design.type);
+fprintf("Funzione obiettivo    = %s\n", design.opt);
+fprintf("Valore obiettivo      = %.8e\n", best_objective);
 
 if lower(string(design.type)) == "star"
     fprintf("Numero punte          = %d\n", best.n_tips);
@@ -478,9 +550,6 @@ fprintf("Thrust iniziale       = %.6f N\n", best.thrust0_opt);
 if lower(string(design.type)) == "star"
     fprintf("Radius factor         = %.6f\n", best.radius_factor_opt);
 end
-
-fprintf("Thrust medio          = %.6f N\n", best.thrust_mean);
-fprintf("IMPULSO TOTALE        = %.6e N s\n", best_impulse);
 
 
 %% ============================================================
@@ -501,65 +570,243 @@ end
 pre_final = run_predesign(design_final);
 
 settings_final = settings;
-settings_final.make_plots = true;
-settings_final.make_animation = true;
-settings_final.verbose = true;
+
+% I plot specifici vengono gestiti separatamente dal main.
+settings_final.make_plots = false;
+settings_final.make_animation = false;
+settings_final.verbose = false;
 
 sim_final = run_temporal_simulation( ...
-    pre_final, settings_final);
+    pre_final, ...
+    settings_final);
 
 
 %% ============================================================
-%  13. RISULTATI FINALI
+%  13. CALCOLO METRICHE FINALI
+%
+%  Entrambe vengono sempre calcolate, indipendentemente da
+%  design.opt.
 % ============================================================
 
-fprintf("\n");
-fprintf("=============================================\n");
-fprintf("          RISULTATI SIMULAZIONE\n");
-fprintf("=============================================\n");
+impulse_metrics = evaluate_impulse_metrics(sim_final);
 
-fprintf("Tempo finale:            %.6f s\n", sim_final.t(end));
-fprintf("Pressione iniziale:      %.6f bar\n", sim_final.p(1)*1e-5);
-fprintf("Pressione finale:        %.6f bar\n", sim_final.p(end)*1e-5);
-fprintf("GOX iniziale:            %.6f kg/(m^2 s)\n", sim_final.Gox(1));
-fprintf("GOX finale:              %.6f kg/(m^2 s)\n", sim_final.Gox(end));
-fprintf("O/F iniziale:            %.6f\n", sim_final.OF(1));
-fprintf("O/F finale:              %.6f\n", sim_final.OF(end));
-fprintf("Spinta media:            %.6f N\n", sim_final.thrust_mean);
-fprintf("Impulso totale:          %.6e N s\n", sim_final.total_impulse);
+shift_metrics = evaluate_shift_metrics( ...
+    sim_final, ...
+    w_OF, ...
+    w_GOX);
 
 
 %% ============================================================
-%  14. PLOT SPINTA
+%  14. OUTPUT IMPULSO
 % ============================================================
 
-figure;
+if show_impulse_output
 
-plot( ...
-    sim_final.t, ...
-    sim_final.thrust, ...
-    "LineWidth", 1.8);
+    fprintf("\n");
+    fprintf("=====================================================\n");
+    fprintf("              OUTPUT IMPULSO\n");
+    fprintf("=====================================================\n");
 
-grid on
+    fprintf("Tempo finale           = %.6f s\n", ...
+        impulse_metrics.duration);
 
-xlabel("Tempo [s]");
-ylabel("Thrust [N]");
+    fprintf("Thrust medio           = %.6f N\n", ...
+        impulse_metrics.thrust_mean);
 
-if lower(string(design.type)) == "star"
+    fprintf("Thrust iniziale sim.   = %.6f N\n", ...
+        impulse_metrics.thrust_initial);
 
-    title(sprintf( ...
-        "Thrust - configurazione ottima STAR (%d punte)", ...
-        best.n_tips));
+    fprintf("Thrust finale sim.     = %.6f N\n", ...
+        impulse_metrics.thrust_final);
 
-else
-
-    title("Thrust - configurazione ottima CYLINDER");
+    fprintf("Impulso totale         = %.6e N s\n", ...
+        impulse_metrics.total_impulse);
 
 end
 
 
 %% ============================================================
-%  15. PLOT IMPULSO VS NUMERO DI PUNTE - SOLO STAR
+%  15. OUTPUT SHIFT
+% ============================================================
+
+if show_shift_output
+
+    fprintf("\n");
+    fprintf("=====================================================\n");
+    fprintf("               OUTPUT SHIFT\n");
+    fprintf("=====================================================\n");
+
+    fprintf("O/F iniziale           = %.6f\n", ...
+        shift_metrics.OF0);
+
+    fprintf("O/F finale             = %.6f\n", ...
+        shift_metrics.OF_final);
+
+    fprintf("GOX iniziale           = %.6f kg/(m^2 s)\n", ...
+        shift_metrics.GOX0);
+
+    fprintf("GOX finale             = %.6f kg/(m^2 s)\n", ...
+        shift_metrics.GOX_final);
+
+    fprintf("RMS shift O/F          = %.6f %%\n", ...
+        100*shift_metrics.RMS_OF);
+
+    fprintf("RMS shift GOX          = %.6f %%\n", ...
+        100*shift_metrics.RMS_GOX);
+
+    fprintf("MAX shift O/F          = %.6f %%\n", ...
+        100*shift_metrics.MAX_OF);
+
+    fprintf("MAX shift GOX          = %.6f %%\n", ...
+        100*shift_metrics.MAX_GOX);
+
+    fprintf("J shift O/F            = %.8e\n", ...
+        shift_metrics.J_OF);
+
+    fprintf("J shift GOX            = %.8e\n", ...
+        shift_metrics.J_GOX);
+
+    fprintf("J shift complessivo    = %.8e\n", ...
+        shift_metrics.J_total);
+
+end
+
+
+%% ============================================================
+%  16. PLOT IMPULSO
+% ============================================================
+
+if show_impulse_plots
+
+    figure;
+
+    plot( ...
+        sim_final.t, ...
+        sim_final.thrust, ...
+        "LineWidth", ...
+        1.8);
+
+    grid on
+
+    xlabel("Tempo [s]");
+    ylabel("Thrust [N]");
+
+    title(sprintf( ...
+        "Thrust nel tempo - %s - opt: %s", ...
+        upper(string(design.type)), ...
+        upper(string(design.opt))));
+
+
+    figure;
+
+    plot( ...
+        sim_final.t, ...
+        impulse_metrics.cumulative_impulse, ...
+        "LineWidth", ...
+        1.8);
+
+    grid on
+
+    xlabel("Tempo [s]");
+    ylabel("Impulso cumulativo [N s]");
+
+    title(sprintf( ...
+        "Impulso cumulativo - %s - opt: %s", ...
+        upper(string(design.type)), ...
+        upper(string(design.opt))));
+
+end
+
+
+%% ============================================================
+%  17. PLOT SHIFT
+% ============================================================
+
+if show_shift_plots
+
+    figure;
+
+    plot( ...
+        sim_final.t, ...
+        shift_metrics.OF_relative, ...
+        "LineWidth", ...
+        1.8);
+
+    hold on
+    yline(1, "--");
+
+    grid on
+
+    xlabel("Tempo [s]");
+    ylabel("(O/F)/(O/F)_0 [-]");
+
+    title(sprintf( ...
+        "Evoluzione relativa O/F - %s - opt: %s", ...
+        upper(string(design.type)), ...
+        upper(string(design.opt))));
+
+
+    figure;
+
+    plot( ...
+        sim_final.t, ...
+        shift_metrics.GOX_relative, ...
+        "LineWidth", ...
+        1.8);
+
+    hold on
+    yline(1, "--");
+
+    grid on
+
+    xlabel("Tempo [s]");
+    ylabel("GOX/GOX_0 [-]");
+
+    title(sprintf( ...
+        "Evoluzione relativa GOX - %s - opt: %s", ...
+        upper(string(design.type)), ...
+        upper(string(design.opt))));
+
+
+    figure;
+
+    plot( ...
+        sim_final.t, ...
+        100*shift_metrics.shift_OF, ...
+        "LineWidth", ...
+        1.8);
+
+    hold on
+
+    plot( ...
+        sim_final.t, ...
+        100*shift_metrics.shift_GOX, ...
+        "LineWidth", ...
+        1.8);
+
+    yline(0, "--");
+
+    grid on
+
+    xlabel("Tempo [s]");
+    ylabel("Shift relativo [%]");
+
+    title(sprintf( ...
+        "Shift O/F e GOX - %s - opt: %s", ...
+        upper(string(design.type)), ...
+        upper(string(design.opt))));
+
+    legend( ...
+        "O/F", ...
+        "GOX", ...
+        "Location", ...
+        "best");
+
+end
+
+
+%% ============================================================
+%  18. CONFRONTO CONFIGURAZIONI STAR
 % ============================================================
 
 if lower(string(design.type)) == "star" && length(results) > 1
@@ -568,15 +815,19 @@ if lower(string(design.type)) == "star" && length(results) > 1
 
     plot( ...
         [results.n_tips], ...
-        impulses, ...
+        [results.fval], ...
         "o-", ...
-        "LineWidth", 1.8);
+        "LineWidth", ...
+        1.8);
 
     grid on
 
     xlabel("Numero di punte");
-    ylabel("Impulso totale [N s]");
-    title("Impulso totale ottimizzato - STAR");
+    ylabel("Valore funzione obiettivo");
+
+    title(sprintf( ...
+        "Obiettivo ottimizzato vs numero di punte - %s", ...
+        upper(string(design.opt))));
 
 end
 
@@ -674,16 +925,84 @@ function sim = evaluate_design_cached( ...
 end
 
 
-function J = objective_function( ...
+function objective = make_objective( ...
+    opt_type, ...
+    geometry_id, ...
+    design_base, ...
+    settings, ...
+    w_OF, ...
+    w_GOX)
+
+    switch lower(string(opt_type))
+
+        case "impulse"
+
+            objective = @(x) objective_impulse( ...
+                x, ...
+                geometry_id, ...
+                design_base, ...
+                settings);
+
+
+        case "shift"
+
+            objective = @(x) objective_shift( ...
+                x, ...
+                geometry_id, ...
+                design_base, ...
+                settings, ...
+                w_OF, ...
+                w_GOX);
+
+
+        otherwise
+
+            error( ...
+                "Funzione obiettivo non riconosciuta: %s. Usare 'impulse' o 'shift'.", ...
+                opt_type);
+
+    end
+
+end
+
+
+function J = objective_impulse( ...
     x, ...
     geometry_id, ...
     design_base, ...
     settings)
 
     sim = evaluate_design_cached( ...
-        x, geometry_id, design_base, settings);
+        x, ...
+        geometry_id, ...
+        design_base, ...
+        settings);
 
     J = -sim.total_impulse / 15e6;
+
+end
+
+
+function J = objective_shift( ...
+    x, ...
+    geometry_id, ...
+    design_base, ...
+    settings, ...
+    w_OF, ...
+    w_GOX)
+
+    sim = evaluate_design_cached( ...
+        x, ...
+        geometry_id, ...
+        design_base, ...
+        settings);
+
+    metrics = evaluate_shift_metrics( ...
+        sim, ...
+        w_OF, ...
+        w_GOX);
+
+    J = metrics.J_total;
 
 end
 
@@ -757,3 +1076,138 @@ function [c, ceq] = optimization_constraints( ...
     ceq = [];
 
 end
+
+%% ============================================================
+%  METRICHE IMPULSO
+% ============================================================
+
+function metrics = evaluate_impulse_metrics(sim)
+
+    t = sim.t(:);
+    thrust = sim.thrust(:);
+
+    metrics = struct();
+
+    metrics.duration = t(end) - t(1);
+    metrics.thrust_initial = thrust(1);
+    metrics.thrust_final = thrust(end);
+    metrics.thrust_mean = sim.thrust_mean;
+    metrics.total_impulse = sim.total_impulse;
+
+    metrics.cumulative_impulse = ...
+        cumtrapz(t, thrust);
+
+end
+
+
+%% ============================================================
+%  METRICHE SHIFT
+% ============================================================
+
+function metrics = evaluate_shift_metrics( ...
+    sim, ...
+    w_OF, ...
+    w_GOX)
+
+    t = sim.t(:);
+
+    OF = sim.OF(:);
+    GOX = sim.Gox(:);
+
+    OF0 = OF(1);
+    GOX0 = GOX(1);
+
+    shift_OF = ...
+        (OF - OF0) / OF0;
+
+    shift_GOX = ...
+        (GOX - GOX0) / GOX0;
+
+    T = t(end) - t(1);
+
+    if T <= 0
+
+        RMS_OF = Inf;
+        RMS_GOX = Inf;
+
+    else
+
+        RMS_OF = sqrt( ...
+            trapz(t, shift_OF.^2) / T);
+
+        RMS_GOX = sqrt( ...
+            trapz(t, shift_GOX.^2) / T);
+
+    end
+
+    MAX_OF = max(abs(shift_OF));
+    MAX_GOX = max(abs(shift_GOX));
+
+    J_OF = RMS_OF;
+    J_GOX = RMS_GOX;
+
+    J_total = ...
+        w_OF * J_OF ...
+        + ...
+        w_GOX * J_GOX;
+
+    metrics = struct();
+
+    metrics.OF0 = OF0;
+    metrics.OF_final = OF(end);
+
+    metrics.GOX0 = GOX0;
+    metrics.GOX_final = GOX(end);
+
+    metrics.shift_OF = shift_OF;
+    metrics.shift_GOX = shift_GOX;
+
+    metrics.OF_relative = OF / OF0;
+    metrics.GOX_relative = GOX / GOX0;
+
+    metrics.RMS_OF = RMS_OF;
+    metrics.RMS_GOX = RMS_GOX;
+
+    metrics.MAX_OF = MAX_OF;
+    metrics.MAX_GOX = MAX_GOX;
+
+    metrics.J_OF = J_OF;
+    metrics.J_GOX = J_GOX;
+    metrics.J_total = J_total;
+
+end
+
+
+%% ============================================================
+%  NORMALIZZAZIONE PER PLOT
+%
+%  Porta un vettore nell'intervallo [0,1].
+%  Se tutti i valori sono uguali restituisce un vettore di 0.5.
+% ============================================================
+
+function y_norm = normalize_for_plot(y)
+
+    y = y(:);
+
+    y_min = min(y, [], "omitnan");
+    y_max = max(y, [], "omitnan");
+
+    if ~isfinite(y_min) || ~isfinite(y_max)
+
+        y_norm = NaN(size(y));
+        return
+
+    end
+
+    if abs(y_max - y_min) < eps(max(abs([y_min y_max 1])))
+
+        y_norm = 0.5 * ones(size(y));
+
+    else
+
+        y_norm = (y - y_min) / (y_max - y_min);
+
+    end
+
+end
+
