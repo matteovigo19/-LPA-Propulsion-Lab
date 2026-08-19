@@ -12,7 +12,7 @@ load("prevars.mat");
 
 if type == "star"
 
-    multiplyer = 80;
+    multiplyer = 10;
     vars.geometry.ntips = n_tips; % da predesign
     vars.geometry.diametro_est = diam_e;    % [m]   da predesign
     vars.geometry.diametro_int = diam_i;     % [m]   da predesign
@@ -61,12 +61,12 @@ OFmax = 19.5;                 % [-]
 pmin = 101325;                % [Pa]
 pmax = 99e5;                  % [Pa]
 
-tmax = 400;                   % [s]
+tmax = 300;                   % [s]
 pamb = 0;                     % [Pa]
 
 % ================= ENGINE DATA =================
 
-ext_diameter = 280.1*2e-3;          % [m]
+ext_diameter = 1000.1*2e-3;          % [m]
 chamber_length = L; %da predesign       % [m]
 
 throat_diameter = 0.15;       % [m]
@@ -282,7 +282,7 @@ fprintf("\tO/F      = %.2f\n", OF0);
 %  STEP 3: INTEGRATE COUPLED CHAMBER + MESH SYSTEM
 % ============================================================
 
-fine_ode_boolean = true;
+fine_ode_boolean = false;
 
 plot_case = "refined";
 % plot_case = "ode45";

@@ -10,14 +10,14 @@ clc
 %  - GOX iniziale
 %  - geometria
 %  - parametri fuel (non ne sono sicuro), magari si possono ricostruire le
-%  percentuali a posteriori dopo aver ottimizzato i parametri relativi
+%    percentuali a posteriori dopo aver ottimizzato i parametri relativi
 
 % variabili non ottimizzabili numericamente:
 %  - swirl injection
 %  - cambio di oxidiser 
 
 
-thrust = 50000;   % N
+thrust = 48222.86;   % N
 
 % rapporto di espansione dell'ugello
 eps = 200;   % Ae/At
@@ -27,10 +27,10 @@ pch_bar = 20;   % bar
 pch = pch_bar*1e5;   % Pa
 
 % rapporto ossidante/combustibile
-O_F = 2;
+O_F = 4;
 
 % oxidizer mass flux (flusso massico di ossidante)
-GOX = 500;   % 500 to 800 [kg/m2s]
+GOX = 552.92;   % 500 to 800 [kg/m2s]
 
 % conviene partire dall'OF più basso possibile
 % GOX tende a scendere nel tempo
@@ -101,14 +101,16 @@ rad_cyl_ref = 0.5*diam_cyl_ref;  % raggio cilindro equivalente con area Ap
 
 % SISTEMARE I COMMENTI IN BASE ALLA SCELTA DELLA GEOMETRIA
 
- %type = "cylinder";
+% type = "cylinder";
+
+radius_factor=0.7;
 
  type = "star";
-    n_tips = 5; % numero di punte della stella
-    radius = rad_cyl_ref*0.7; % il valore del fattore non è fisso (?)
+    n_tips = 6; % numero di punte della stella
+    radius = rad_cyl_ref*radius_factor; % il valore del fattore non è fisso (?)
 
 % type = "RAT"; % stella o RAT
-%    radius = rad_cyl_ref*0.7; % il valore del fattore non è fisso (?)
+%    radius = rad_cyl_ref*radius_factor; % il valore del fattore non è fisso (?)
 
 
 % fissata l'area del porto si procede a svolgere i calcoli relativi alla
