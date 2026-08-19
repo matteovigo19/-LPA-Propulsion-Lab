@@ -46,7 +46,7 @@ design.n_rf = 0.75;
 % ============================================================
 
 % "star" oppure "cylinder"
-design.type = "cylinder";
+design.type = "star";
 
 % ============================================================
 % SCELTA FUNZIONE OBIETTIVO
@@ -75,8 +75,10 @@ show_shift_plots  = true;
 %  4. LIMITI VARIABILI DI OTTIMIZZAZIONE
 % ============================================================
 
-OF_min = 3;
-OF_max_global = 4.5;
+% 2.2 -> 5  star
+
+OF_min = 2.2;
+OF_max_global = 5;
 
 % SOLO STAR: hn-òpopmassimo O/F iniziale dipendente dal numero di punte.
 OF_max_by_tips = containers.Map( ...
@@ -99,7 +101,7 @@ radius_factor_max = 0.8;
 
 % SOLO STAR
 n_tips_min = 4;
-n_tips_max = 4;
+n_tips_max = 8;
 n_tips_values = n_tips_min:n_tips_max;
 
 %% ============================================================
@@ -162,7 +164,7 @@ options = optimoptions( ...
 
 rng("shuffle");
 
-n_guess = 20;
+n_guess = 5;
 results = struct([]);
 
 %% ============================================================
