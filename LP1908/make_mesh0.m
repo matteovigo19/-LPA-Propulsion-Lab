@@ -14,7 +14,10 @@ function [coord, coordmesh, coord_v, idx_v, idx_v_interni, idx_v_esterni] = make
     theta = linspace(0, pi, n + 1)';
     r = ones(size(theta)) * diam/2;
 
-    coordmesh = [];
+    [x_mesh, y_mesh]=pol2cart(theta, r);
+    coordmesh=[x_mesh, y_mesh];
+
+    coord=[];
     coord_v = [];
     idx_v = [];
     idx_v_interni = [];
